@@ -1,15 +1,46 @@
 package com.sas.youthlagpriskalander.service
 
 import com.sas.youthlagpriskalander.model.Price
+import com.sas.youthlagpriskalander.repository.PriceRepository
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import reactor.core.publisher.Mono
 
 @Service
-class priceService(@Autowired private val webClient: WebClient) {
+class PriceService(@Autowired private val webClient: WebClient, private val priceRepository: PriceRepository) {
 
-    public fun fetchPrice(from : String, to : String, monthIndex : String, ): Mono<List<Price>?> {
+
+    @Value("\${price.origins}")
+    lateinit var origins : List<String>
+
+    @Value("\${price.destinations}")
+    lateinit var destinations  : List<String>
+
+    @Value("\${price.months}")
+    lateinit var months : List<String>
+
+    @Value("\${price.year}")
+    lateinit var year : String
+
+    @Scheduled(cron = "0 0 0 * * *")
+    fun updatePrices() {
+
+        origins.forEach { from -> destinations.forEach { to ->
+            months.forEach { month ->
+                val monthIndex = "2025${month}"
+                val prices = this.fetchPrice(from, to, monthIndex).block()
+
+                if (!prices.isNullOrEmpty()) {
+                    priceRepository.saveAll(prices)
+                }
+            }
+        } }
+    }
+
+    fun fetchPrice(from : String, to : String, monthIndex : String, ): Mono<List<Price>?> {
         val url = ""
         return webClient.get()
             .uri { uriBuilder ->
@@ -29,8 +60,8 @@ class priceService(@Autowired private val webClient: WebClient) {
             .map { response ->
                 val outboundPrices = response.outbound.map { (date, info) ->
                     Price(
-                        from = from,
-                        to = to,
+                        departure = from,
+                        destination = to,
                         date = date,
                         lowestPrice = info.totalPrice,
                     )
@@ -38,8 +69,8 @@ class priceService(@Autowired private val webClient: WebClient) {
 
                 val inboundPrices = response.inbound.map { (date, info) ->
                     Price(
-                        from = to,
-                        to = from,
+                        departure = to,
+                        destination = from,
                         date = date,
                         lowestPrice = info.totalPrice,
                     )
