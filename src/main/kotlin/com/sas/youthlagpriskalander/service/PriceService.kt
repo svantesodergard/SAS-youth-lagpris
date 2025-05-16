@@ -8,6 +8,8 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import reactor.core.publisher.Mono
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 @Service
 class PriceService(@Autowired private val webClient: WebClient, private val priceRepository: PriceRepository) {
@@ -24,6 +26,8 @@ class PriceService(@Autowired private val webClient: WebClient, private val pric
 
     @Value("\${price.year}")
     lateinit var year : String
+
+    val dateFormat = DateTimeFormatter.ofPattern("yyyyMMdd")
 
     @Scheduled(cron = "0 0 0 * * *")
     fun updatePrices() {
@@ -62,7 +66,7 @@ class PriceService(@Autowired private val webClient: WebClient, private val pric
                     Price(
                         departure = from,
                         destination = to,
-                        date = date,
+                        date = LocalDate.parse(date, dateFormat),
                         lowestPrice = info.totalPrice,
                     )
                 }
@@ -71,7 +75,7 @@ class PriceService(@Autowired private val webClient: WebClient, private val pric
                     Price(
                         departure = to,
                         destination = from,
-                        date = date,
+                        date = LocalDate.parse(date, dateFormat),
                         lowestPrice = info.totalPrice,
                     )
                 }
