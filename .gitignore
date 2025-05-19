@@ -40,3 +40,4 @@ out/
 ### Kotlin ###
 .kotlin
 /data/
+/src/main/kotlin/com/sas/youthlagpriskalander/config/WebConfig.kt
