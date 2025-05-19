@@ -12,36 +12,51 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 @Service
-class PriceService(@Autowired private val webClient: WebClient, private val priceRepository: PriceRepository) {
+class PriceService(
+    @Autowired private val webClient: WebClient,
+    private val priceRepository: PriceRepository,
+    @Value("\${price.monthCount}") var monthCount : Int
+) {
 
 
     @Value("\${price.origins}")
-    lateinit var origins : List<String>
+    lateinit var departures : List<String>
 
     @Value("\${price.destinations}")
     lateinit var destinations  : List<String>
 
-    @Value("\${price.months}")
-    lateinit var months : List<String>
 
-    @Value("\${price.year}")
-    lateinit var year : String
+
 
     val dateFormat = DateTimeFormatter.ofPattern("yyyyMMdd")
 
     @Scheduled(cron = "0 0 0 * * *")
     fun updatePrices() {
+        val currentMonth = LocalDate.now().monthValue
+        val currentYear = LocalDate.now().year
 
-        origins.forEach { from -> destinations.forEach { to ->
-            months.forEach { month ->
-                val monthIndex = "2025${month}"
-                val prices = this.fetchPrice(from, to, monthIndex).block()
+        val monthIndices = (currentMonth until currentMonth + monthCount).map { month ->
+            val year = if (month > 12) currentYear + 1 else currentYear
+            "$year${String.format("%02d", month % 12)}"
+        }
 
+        val allLowestPrices = mutableListOf<Price>()
+
+        departures.forEach { departure -> destinations.forEach { destination ->
+            monthIndices.forEach { monthIndex ->
+                val prices = this.fetchPrice(departure, destination, monthIndex).block()
                 if (!prices.isNullOrEmpty()) {
-                    priceRepository.saveAll(prices)
+
+                    val lowestPricesPerMonth = prices.groupBy { Triple(it.date.month, it.departure, it.destination) }
+                        .map { it.value.minBy { price -> price.lowestPrice } }
+
+                    allLowestPrices.addAll(lowestPricesPerMonth)
                 }
             }
         } }
+
+        priceRepository.deleteAll()
+        priceRepository.saveAll(allLowestPrices)
     }
 
     fun fetchPrice(from : String, to : String, monthIndex : String, ): Mono<List<Price>?> {

@@ -1,6 +1,7 @@
 package com.sas.youthlagpriskalander.controller
 
 import com.sas.youthlagpriskalander.model.Price
+import com.sas.youthlagpriskalander.model.PriceResponseDto
 import com.sas.youthlagpriskalander.repository.PriceRepository
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.web.bind.annotation.CrossOrigin
@@ -20,13 +21,13 @@ class PriceController (private val priceRepository: PriceRepository) {
         @RequestParam month : Int,
         @RequestParam year : Int,
         @RequestParam departure : String
-    ) : List<Price> {
+    ) : List<PriceResponseDto> {
 
         val startDate = LocalDate.of(year, month, 1)
         val endDate = LocalDate.of(year, month, startDate.lengthOfMonth())
         return priceRepository.findByDateBetween(startDate, endDate)
             .filter { it.departure == departure }.groupBy { it.destination }
-                .map { it.value.minBy { price -> price.lowestPrice } }
+                .map { it.value.minBy { price -> price.lowestPrice } }.map { it.toDto() }
 
             //.map { it.key to it.value.minBy { p -> p.lowestPrice } }.toMap()
     }
@@ -37,7 +38,7 @@ class PriceController (private val priceRepository: PriceRepository) {
         @RequestParam startYear : Int,
         @RequestParam monthCount : Int,
         @RequestParam departure : String
-    ) : Map<String, List<Price>> {
+    ) : Map<String, List<PriceResponseDto>> {
 
         if (monthCount > 12) {
             throw IllegalArgumentException("Prisuppgifter tillgängliga max tolv (12) månader framåt")
@@ -51,4 +52,9 @@ class PriceController (private val priceRepository: PriceRepository) {
         }
 
     }
+
+    @GetMapping("getAllMonths")
+    fun getAllMonths() = priceRepository.findDistinctMonths()
+        .map { Month.of(it).getDisplayName(TextStyle.FULL, Locale("sv"))
+            .replaceFirstChar { it.uppercase() } }
 }
